@@ -1,183 +1,38 @@
-Алексей Готовко, [01.10.2025 14:41]
 <!DOCTYPE html>
 <html>
 <head>
-    <title>YouTube Playlist Autoplay</title>
-    <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            overflow: hidden;
-            background-color: black;
-        }
-        #player {
-            width: 100vw;
-            height: 100vh;
-        }
-        #status {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            color: white;
-            background: rgba(0,0,0,0.7);
-            padding: 5px;
-            font-family: Arial, sans-serif;
-            font-size: 12px;
-            z-index: 100;
-        }
-    </style>
+    <title>YouTube Playlist</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: black; }</style>
 </head>
 <body>
-    <div id="status">Загрузка плейлиста...</div>
-    <div id="player"></div>
+    <iframe 
+        id="player"
+        width="100%" 
+        height="100%" 
+        src=""
+        frameborder="0"
+        allow="autoplay; encrypted-media"
+        allowfullscreen>
+    </iframe>
 
     <script>
-        // ЗАМЕНИТЕ ЭТОТ ID НА ВАШ REAL PLAYLIST ID
+        // ЗАМЕНИТЕ НА ВАШ ID ПЛЕЙЛИСТА
         var playlistId = 'PL0dHPBgIOh_W5GrxjHS3XftanvNbcc6xv';
-
-        // Статусы для отслеживания
-        var statusElement = document.getElementById('status');
         
-        function updateStatus(message) {
-            statusElement.textContent = message;
-            console.log(message);
-        }
-
-        // Загрузка YouTube API
-        var tag = document.createElement('script');
-        tag.src = "https://www.youtube.com/iframe_api";
-        var firstScriptTag = document.getElementsByTagName('script')[0];
-        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-
-        var player;
-        var autoplayAttempts = 0;
-        var maxAutoplayAttempts = 3;
-
-        function onYouTubeIframeAPIReady() {
-            updateStatus("YouTube API готово, создаю плеер...");
-            
-            player = new YT.Player('player', {
-                height: '100%',
-                width: '100%',
-                playerVars: {
-                    'listType': 'playlist',
-                    'list': playlistId,
-                    'autoplay': 1,
-                    'controls': 0,
-                    'modestbranding': 1,
-                    'rel': 0,
-                    'showinfo': 0,
-                    'fs': 0,
-                    'iv_load_policy': 3,
-                    'enablejsapi': 1,
-                    'playsinline': 1 // Для iOS - воспроизведение без полноэкранного режима
-                },
-                events: {
-                    'onReady': onPlayerReady,
-                    'onStateChange': onPlayerStateChange,
-                    'onError': onPlayerError
-                }
-            });
-        }
-
-        function onPlayerReady(event) {
-            updateStatus("Плеер готов, запускаю воспроизведение...");
-            
-            // Первая попытка автовоспроизведения
-            setTimeout(function() {
-                event.target.playVideo();
-                autoplayAttempts++;
-                
-                // Дополнительная проверка через 2 секунды
-                setTimeout(checkPlaybackState, 2000);
-            }, 1000);
-        }
-
-        function checkPlaybackState() {
-            if (player && player.getPlayerState) {
-                var state = player.getPlayerState();
-                updateStatus("Состояние плеера: " + getStateName(state));
-                
-                // Если видео не воспроизводится (состояние -1, 5, 2), пробуем снова
-                if (state !== YT.PlayerState.PLAYING && state !== YT.PlayerState.BUFFERING) {
-                    if (autoplayAttempts < maxAutoplayAttempts) {
-                        updateStatus("Попытка перезапуска " + autoplayAttempts + "/" + maxAutoplayAttempts);
-                        player.playVideo();
-                        autoplayAttempts++;
-                    }
-                }
-            }
-        }
-
-        function onPlayerStateChange(event) {
-            var stateName = getStateName(event.data);
-            updateStatus("Состояние: " + stateName);
-            
-            switch(event.data) {
-		case YT.PlayerState.ENDED:
-                    // Плейлист завершен - начинаем сначала
-                    updateStatus("Плейлист завершен, перезапуск...");
-                    setTimeout(function() {
-                        player.playVideoAt(0); // Начинаем с первого видео
-                    }, 3000);
-                    break;
-                    
-                case YT.PlayerState.PLAYING:
-                    updateStatus("Воспроизведение началось!");
-                    // Скрываем статус через 3 секунды после начала воспроизведения
-                    setTimeout(function() {
-                        statusElement.style.display = 'none';
-                    }, 3000);
-                    break;
-                    
-                case YT.PlayerState.PAUSED:
-                    // Если видео paused, возобновляем воспроизведение
-                    setTimeout(function() {
-                        player.playVideo();
-                    }, 1000);
-                    break;
-                    
-                case YT.PlayerState.CUED:
-                    updateStatus("Видео готово к воспроизведению");
-                    setTimeout(function() {
-                        player.playVideo();
-                    }, 500);
-                    break;
-            }
-        }
-
-        function onPlayerError(event) {
-            updateStatus("Ошибка плеера: " + event.data);
-            // При ошибке пробуем перезапустить через 5 секунд
-            setTimeout(function() {
-                player.playVideo();
-            }, 5000);
-        }
-
-        function getStateName(state) {
-            switch(state) {
-                case -1: return 'NOT_STARTED';
-                case 0: return 'ENDED';
-                case 1: return 'PLAYING';
-                case 2: return 'PAUSED';
-                case 3: return 'BUFFERING';
-                case 5: return 'VIDEO_CUED';
-                default: return 'UNKNOWN';
-            }
-        }
-
-        // Дополнительный перезапуск каждые 10 минут на случай зависания
-        setInterval(function() {
-            if (player && player.getPlayerState) {
-                var state = player.getPlayerState();
-                if (state !== YT.PlayerState.PLAYING && state !== YT.PlayerState.BUFFERING) {
-                    updateStatus("Профилактический перезапуск...");
-                    player.playVideo();
-                }
-            }
-        }, 600000); // 10 минут
-
+        // Создаем URL с плейлистом
+        var youtubeUrl = 'https://www.youtube.com/embed/videoseries?list=' + playlistId + 
+                        '&autoplay=1&mute=1&loop=1&playlist=' + playlistId + 
+                        '&controls=0&modestbranding=1&rel=0';
+        
+        // Устанавливаем источник для iframe
+        document.getElementById('player').src = youtubeUrl;
+        
+        // Включаем звук через 3 секунды
+        setTimeout(function() {
+            var iframe = document.getElementById('player');
+            iframe.contentWindow.postMessage('{"event":"command","func":"unMute","args":""}', '*');
+        }, 3000);
     </script>
 </body>
 </html>
